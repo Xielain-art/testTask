@@ -6,6 +6,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@google/genai": "^1.38.0",
     "@types/pg": "^8.16.0",
     "pg": "^8.17.2",
     "redis": "^5.10.0",

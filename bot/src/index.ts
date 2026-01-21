@@ -5,6 +5,18 @@ import { ChatModel } from "./models/ChatModel";
 import { MessageModel } from "./models/MessageModel";
 import { StatsService, TimeFilter } from "./services/StatsService";
 import { CacheService } from "./services/CasheService";
+import { AnalyzeService } from "./services/AnalyzeService";
+
+import { GoogleGenAI } from "@google/genai";
+import { isAdmin } from "./helpers/isAdmin";
+
+const analyzeCooldown = new Map<number, number>();
+
+const ANALYZE_COOLDOWN_MS = 5 * 60 * 1000; // 5 минут
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+});
 
 async function start() {
   await initDb();
@@ -32,6 +44,87 @@ async function start() {
     });
 
     console.log("Message saved");
+  });
+
+  bot.command("analyze", async (ctx) => {
+    // Получаем внутренний chat.id
+    const chat = await ChatModel.findOrCreate({
+      telegramId: ctx.chat.id,
+      title: "title" in ctx.chat ? ctx.chat.title : undefined,
+    });
+
+    const chatId = chat.id;
+
+    // Команда должна быть reply
+    if (!ctx.message.reply_to_message) {
+      await ctx.reply("Используй /analyze ответом на сообщение пользователя");
+      return;
+    }
+
+    const requesterId = ctx.from.id;
+
+    // Проверяем, админ ли вызывающий
+    const admin = await isAdmin(ctx, requesterId);
+
+    // Если не админ — проверяем кулдаун
+    if (!admin) {
+      const lastTime = analyzeCooldown.get(requesterId) || 0;
+      const now = Date.now();
+
+      const diff = now - lastTime;
+
+      if (diff < ANALYZE_COOLDOWN_MS) {
+        const secondsLeft = Math.ceil((ANALYZE_COOLDOWN_MS - diff) / 1000);
+
+        await ctx.reply(
+          `⏳ Эту команду можно использовать раз в 5 минут.\nПопробуй через ${secondsLeft} сек.`,
+        );
+        return;
+      }
+    }
+
+    const targetUser = ctx.message.reply_to_message.from;
+
+    if (!targetUser) {
+      await ctx.reply("Не удалось определить пользователя");
+      return;
+    }
+
+    const targetTelegramId = targetUser.id;
+    const targetUsername =
+      targetUser.username || targetUser.first_name || "unknown";
+
+    await ctx.reply("🔎 Собираю сообщения и делаю анализ...");
+
+    try {
+      const result = await AnalyzeService.analyzeUser({
+        chatId,
+        telegramUserId: targetTelegramId,
+        username: targetUsername,
+        limit: 80,
+      });
+
+      if (!result.ok) {
+        await ctx.reply(result.error!);
+        return;
+      }
+
+      // Если не админ — обновляем таймстемп
+      if (!admin) {
+        analyzeCooldown.set(requesterId, Date.now());
+      }
+
+      const finalMessage = `🧠 Анализ пользователя @${
+        targetUsername.startsWith("@")
+          ? targetUsername.slice(1)
+          : targetUsername
+      }\n\n${result.analysis}\n\nНа основе ${result.messagesCount} сообщений.`;
+
+      await ctx.reply(finalMessage);
+    } catch (error) {
+      console.error("Analyze error:", error);
+      await ctx.reply("Ошибка при анализе пользователя");
+    }
   });
 
   // Команда /stats - общая статистика
