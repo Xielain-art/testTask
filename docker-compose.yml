@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: telegram_stats
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+
+  bot:
+    build: ./bot
+    env_file: .env
+    depends_on:
+      - postgres
