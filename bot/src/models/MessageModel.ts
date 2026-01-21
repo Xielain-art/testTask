@@ -2,6 +2,16 @@ import { pool } from "../db/pg";
 import { TimeFilter } from "../services/StatsService";
 
 export class MessageModel {
+  static readonly DOW_NAMES_RU = [
+    "Воскресенье",
+    "Понедельник",
+    "Вторник",
+    "Среда",
+    "Четверг",
+    "Пятница",
+    "Суббота",
+  ] as const;
+
   static async create(data: { chatId: number; userId: number; text: string }) {
     await pool.query(
       `
@@ -23,6 +33,50 @@ export class MessageModel {
       default:
         return "";
     }
+  }
+
+  static async getMostActiveWeekdayForChat(
+    chatId: number,
+    filter: TimeFilter,
+  ): Promise<{ dow: number; messageCount: number } | null> {
+    const dateFilter = this.getDateFilter(filter);
+
+    const result = await pool.query(
+      `SELECT
+        EXTRACT(DOW FROM m.created_at)::int as dow,
+        COUNT(m.id)::int as "messageCount"
+      FROM messages m
+      WHERE m.chat_id = $1 ${dateFilter}
+      GROUP BY dow
+      ORDER BY "messageCount" DESC, dow ASC
+      LIMIT 1`,
+      [chatId],
+    );
+
+    return result.rows[0] || null;
+  }
+
+  static async getMostActiveWeekdayForUser(
+    chatId: number,
+    telegramUserId: number,
+    filter: TimeFilter,
+  ): Promise<{ dow: number; messageCount: number } | null> {
+    const dateFilter = this.getDateFilter(filter);
+
+    const result = await pool.query(
+      `SELECT
+        EXTRACT(DOW FROM m.created_at)::int as dow,
+        COUNT(m.id)::int as "messageCount"
+      FROM messages m
+      JOIN users u ON m.user_id = u.id
+      WHERE m.chat_id = $1 AND u.telegram_id = $2 ${dateFilter}
+      GROUP BY dow
+      ORDER BY "messageCount" DESC, dow ASC
+      LIMIT 1`,
+      [chatId, telegramUserId],
+    );
+
+    return result.rows[0] || null;
   }
 
   static async getTopUsers(

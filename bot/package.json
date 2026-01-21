@@ -10,7 +10,8 @@
     "@types/pg": "^8.16.0",
     "pg": "^8.17.2",
     "redis": "^5.10.0",
-    "telegraf": "^4.16.0"
+    "telegraf": "^4.16.0",
+    "vitest": "^4.0.17"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
