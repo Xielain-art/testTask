@@ -13,7 +13,19 @@ Telegram Stats (Bot + Web)
 - Использование AI
 - Тесты
 
-1. Запуск проекта
+1. Настройка .env (корень репозитория)
+--------------------------------------
+```
+BOT_TOKEN=your_telegram_bot_token
+DATABASE_URL=postgres://postgres:postgres@postgres:5432/telegram_stats
+REDIS_URL=redis://redis:6379
+CACHE_TTL=1200
+GEMINI_API_KEY=your_gemini_api_key
+```
+`CACHE_TTL` — время жизни кеша в Redis (сек), по умолчанию 20 минут.
+
+
+2. Запуск проекта
 -----------------
 Требования: Docker + Docker Compose.
 
@@ -29,16 +41,6 @@ docker compose up --build
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
 
-2. Настройка .env (корень репозитория)
---------------------------------------
-```
-BOT_TOKEN=your_telegram_bot_token
-DATABASE_URL=postgres://postgres:postgres@postgres:5432/telegram_stats
-REDIS_URL=redis://redis:6379
-CACHE_TTL=1200
-GEMINI_API_KEY=your_gemini_api_key
-```
-`CACHE_TTL` — время жизни кеша в Redis (сек), по умолчанию 20 минут.
 
 3. Как пользоваться ботом
 -------------------------

@@ -18,7 +18,8 @@ export default function AnalyzePage() {
 
         {/* Input card */}
         <div className="rounded-2xl bg-neutral-800 border border-neutral-700 p-4 shadow">
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
+            <span>@</span>
             <input
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
