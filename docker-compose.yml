@@ -23,6 +23,15 @@ services:
       - redis
     restart: unless-stopped
 
+  web:
+    build: ./web
+    env_file: .env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
