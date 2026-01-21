@@ -19,4 +19,11 @@ export class UserModel {
 
     return res.rows[0];
   }
+  static async findByTelegramId(telegramId: number) {
+    const result = await pool.query(
+      "SELECT id, telegram_id, username, first_name FROM users WHERE telegram_id = $1",
+      [telegramId],
+    );
+    return result.rows[0] || null;
+  }
 }
