@@ -137,6 +137,27 @@ async function start() {
     await showMainMenu(ctx, chat.id);
   });
 
+  // Команда /activity — самый активный день недели (чат или reply на пользователя)
+  bot.command("activity", async (ctx) => {
+    const chat = await ChatModel.findOrCreate({
+      telegramId: ctx.chat.id,
+      title: "title" in ctx.chat ? ctx.chat.title : undefined,
+    });
+
+    const replyFrom = ctx.message?.reply_to_message?.from;
+    const filter: TimeFilter = "all";
+
+    if (replyFrom) {
+      await showUserActivity(ctx, chat.id, replyFrom.id, filter, {
+        username: replyFrom.username,
+        firstName: replyFrom.first_name,
+      });
+      return;
+    }
+
+    await showChatActivity(ctx, chat.id, filter);
+  });
+
   // Главное меню статистики
   async function showMainMenu(ctx: any, chatId: number) {
     const message = "📊 Статистика чата\n\nВыберите действие:";
@@ -146,6 +167,12 @@ async function start() {
         Markup.button.callback(
           "📈 Общая статистика",
           `general_stats:${chatId}`,
+        ),
+      ],
+      [
+        Markup.button.callback(
+          "📅 Самый активный день недели",
+          `activity_chat:${chatId}:all`,
         ),
       ],
       [
@@ -183,6 +210,25 @@ async function start() {
 
     await ctx.answerCbQuery();
     await showGeneralStats(ctx, chatId, filter);
+  });
+
+  // Самый активный день недели (чат)
+  bot.action(/^activity_chat:(\d+):(.+)$/, async (ctx) => {
+    const chatId = parseInt(ctx.match[1]);
+    const filter = ctx.match[2] as TimeFilter;
+
+    await ctx.answerCbQuery();
+    await showChatActivity(ctx, chatId, filter);
+  });
+
+  // Самый активный день недели (пользователь)
+  bot.action(/^activity_user:(\d+):(\d+):(.+)$/, async (ctx) => {
+    const chatId = parseInt(ctx.match[1]);
+    const telegramUserId = parseInt(ctx.match[2]);
+    const filter = ctx.match[3] as TimeFilter;
+
+    await ctx.answerCbQuery();
+    await showUserActivity(ctx, chatId, telegramUserId, filter);
   });
 
   // Показ общей статистики
@@ -255,6 +301,121 @@ async function start() {
       } else {
         throw error;
       }
+    }
+  }
+
+  async function showChatActivity(ctx: any, chatId: number, filter: TimeFilter) {
+    const result = await StatsService.getMostActiveWeekdayForChat(chatId, filter);
+
+    const filterNames: Record<string, string> = {
+      week: "неделю",
+      month: "месяц",
+      all: "все время",
+    };
+
+    let message = `📅 Самый активный день недели (чат)\n`;
+    message += `Период: ${filterNames[filter] || "указанный период"}\n\n`;
+
+    if (!result) {
+      message += "Нет сообщений за этот период";
+    } else {
+      const dayName = MessageModel.DOW_NAMES_RU[result.dow] || "Неизвестно";
+      message += `${dayName} — ${result.messageCount} ${declension(result.messageCount, [
+        "сообщение",
+        "сообщения",
+        "сообщений",
+      ])}`;
+    }
+
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback(
+          filter === "week" ? "• Неделя" : "Неделя",
+          `activity_chat:${chatId}:week`,
+        ),
+        Markup.button.callback(
+          filter === "month" ? "• Месяц" : "Месяц",
+          `activity_chat:${chatId}:month`,
+        ),
+      ],
+      [
+        Markup.button.callback(
+          filter === "all" ? "• Все время" : "Все время",
+          `activity_chat:${chatId}:all`,
+        ),
+      ],
+      [Markup.button.callback("« В меню", `back_to_menu:${chatId}`)],
+    ]);
+
+    try {
+      await ctx.editMessageText(message, keyboard);
+    } catch (error: any) {
+      await ctx.reply(message, keyboard);
+    }
+  }
+
+  async function showUserActivity(
+    ctx: any,
+    chatId: number,
+    telegramUserId: number,
+    filter: TimeFilter,
+    userHint?: { username?: string; firstName?: string },
+  ) {
+    const result = await StatsService.getMostActiveWeekdayForUser(
+      chatId,
+      telegramUserId,
+      filter,
+    );
+
+    const filterNames: Record<string, string> = {
+      week: "за неделю",
+      month: "за месяц",
+      all: "за все время",
+    };
+
+    const userName =
+      userHint?.username
+        ? `@${userHint.username}`
+        : userHint?.firstName || `ID ${telegramUserId}`;
+
+    let message = `📅 Самый активный день недели (пользователь ${userName})\n`;
+    message += `Период: ${filterNames[filter] || "указанный период"}\n\n`;
+
+    if (!result) {
+      message += "Нет сообщений за этот период";
+    } else {
+      const dayName = MessageModel.DOW_NAMES_RU[result.dow] || "Неизвестно";
+      message += `${dayName} — ${result.messageCount} ${declension(result.messageCount, [
+        "сообщение",
+        "сообщения",
+        "сообщений",
+      ])}`;
+    }
+
+    const keyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback(
+          filter === "week" ? "• Неделя" : "Неделя",
+          `activity_user:${chatId}:${telegramUserId}:week`,
+        ),
+        Markup.button.callback(
+          filter === "month" ? "• Месяц" : "Месяц",
+          `activity_user:${chatId}:${telegramUserId}:month`,
+        ),
+      ],
+      [
+        Markup.button.callback(
+          filter === "all" ? "• Все время" : "Все время",
+          `activity_user:${chatId}:${telegramUserId}:all`,
+        ),
+      ],
+      [Markup.button.callback("« В меню", `back_to_menu:${chatId}`)],
+    ]);
+
+    try {
+      await ctx.editMessageText(message, keyboard);
+    } catch (error: any) {
+      await ctx.reply(message, keyboard);
     }
   }
 

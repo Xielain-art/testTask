@@ -1,24 +1,25 @@
 import { GoogleGenAI } from "@google/genai";
-import { MessageModel } from "../models/MessageModel";
+import { AnalyzeResult, ErrorResult, Message } from "@/types/analyze.types";
 
 export class AnalyzeService {
-  private static ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
-  });
+  private static ai =
+    process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 0
+      ? new GoogleGenAI({
+          apiKey: process.env.GEMINI_API_KEY,
+        })
+      : null;
 
   static async analyzeUser(params: {
-    chatId: number;
-    telegramUserId: number;
-    username: string;
-    limit?: number;
-  }) {
-    const { chatId, telegramUserId, username, limit = 80 } = params;
+    messages: Message[];
+  }): Promise<AnalyzeResult | ErrorResult> {
+    const { messages } = params;
 
-    const messages = await MessageModel.getLastMessagesByUser(
-      chatId,
-      telegramUserId,
-      limit,
-    );
+    if (!this.ai) {
+      return {
+        ok: false,
+        error: "Gemini API key is not configured",
+      };
+    }
 
     if (messages.length < 5) {
       return {
@@ -31,18 +32,21 @@ export class AnalyzeService {
       return `[${m.created_at}] ${m.text}`;
     });
 
-    console.log(messagesWithTime);
+    const prompt = this.buildPrompt(messagesWithTime);
 
-    // 2. Собираем промпт
-    const prompt = this.buildPrompt(username, messagesWithTime);
-
-    // 3. Запрос в Gemini
     const response = await this.ai.models.generateContent({
       model: "gemini-2.5-flash-lite",
       contents: prompt,
     });
 
     const analysisText = response.text;
+
+    if (!analysisText) {
+      return {
+        ok: false,
+        error: "Не удалось получить анализ",
+      };
+    }
 
     return {
       ok: true,
@@ -51,7 +55,7 @@ export class AnalyzeService {
     };
   }
 
-  private static buildPrompt(username: string, messages: string[]) {
+  private static buildPrompt(messages: string[]) {
     return `
 Ниже приведены сообщения пользователя из чата.
 Каждое сообщение имеет формат:

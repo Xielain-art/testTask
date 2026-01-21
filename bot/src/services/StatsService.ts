@@ -31,6 +31,10 @@ export interface MostActiveWeekday {
   messageCount: number;
 }
 
+type CachedActivity =
+  | { ok: true; data: MostActiveWeekday }
+  | { ok: false };
+
 export type TimeFilter = "today" | "week" | "month" | "all";
 
 export class StatsService {
@@ -106,13 +110,13 @@ export class StatsService {
   ): Promise<MostActiveWeekday | null> {
     const cacheKey = `activity:chat:${chatId}:${filter}`;
 
-    const cached = await CacheService.get<MostActiveWeekday | null>(cacheKey);
-    if (cached !== null) {
-      return cached;
+    const cached = await CacheService.get<CachedActivity>(cacheKey);
+    if (cached) {
+      return cached.ok ? cached.data : null;
     }
 
     const result = await MessageModel.getMostActiveWeekdayForChat(chatId, filter);
-    await CacheService.set(cacheKey, result);
+    await CacheService.set(cacheKey, result ? { ok: true, data: result } : { ok: false });
     return result;
   }
 
@@ -123,9 +127,9 @@ export class StatsService {
   ): Promise<MostActiveWeekday | null> {
     const cacheKey = `activity:user:${chatId}:${telegramUserId}:${filter}`;
 
-    const cached = await CacheService.get<MostActiveWeekday | null>(cacheKey);
-    if (cached !== null) {
-      return cached;
+    const cached = await CacheService.get<CachedActivity>(cacheKey);
+    if (cached) {
+      return cached.ok ? cached.data : null;
     }
 
     const result = await MessageModel.getMostActiveWeekdayForUser(
@@ -133,7 +137,7 @@ export class StatsService {
       telegramUserId,
       filter,
     );
-    await CacheService.set(cacheKey, result);
+    await CacheService.set(cacheKey, result ? { ok: true, data: result } : { ok: false });
     return result;
   }
 }

@@ -152,7 +152,7 @@ describe("StatsService", () => {
     it("should return cached weekday data if available", async () => {
       const mockWeekday = { dow: 1, messageCount: 150 };
 
-      vi.mocked(CacheService.get).mockResolvedValue(mockWeekday);
+      vi.mocked(CacheService.get).mockResolvedValue({ ok: true, data: mockWeekday });
 
       const result = await StatsService.getMostActiveWeekdayForChat(1, "week");
 
@@ -173,7 +173,7 @@ describe("StatsService", () => {
       expect(result).toEqual(mockWeekday);
       expect(CacheService.set).toHaveBeenCalledWith(
         "activity:chat:1:all",
-        mockWeekday,
+        { ok: true, data: mockWeekday },
       );
     });
   });
